@@ -13,6 +13,15 @@ Proyecto de **Minería de Texto y Análisis de Sentimientos** aplicado a la prop
 
 Este análisis fue desarrollado como proyecto académico para el curso **Técnicas de Exploración de Datos**, impartido por el profesor **Jesús Salinas**.
 
+## 📂 Documentos Principales
+
+| Archivo | Descripción |
+|---------|-------------|
+| 📄 **[analisis_completo.html](analisis_completo.html)** | Reporte completo del análisis con todos los detalles, gráficos y resultados |
+| 📑 **[EXPOANALISISTEXTO.pdf](EXPOANALISISTEXTO.pdf)** | Presentación de la exposición realizada del proyecto |
+
+> 💡 **Tip**: Descarga el archivo `analisis_completo.html` y ábrelo en tu navegador para ver el análisis interactivo completo.
+
 ## 🎯 Objetivos
 
 - Aplicar técnicas de minería de texto para extraer insights del documento electoral
@@ -38,9 +47,9 @@ Este análisis fue desarrollado como proyecto académico para el curso **Técnic
 ```
 ├── 📄 01_lectura_limpieza.R          # Script principal de análisis
 ├── 📄 analisis_completo.Rmd          # Documento R Markdown completo
-├── 📄 analisis_completo.html         # Reporte HTML generado
+├── 📄 analisis_completo.html         # ⭐ Reporte HTML con análisis detallado
 ├── 📄 EXPOANALISISTEXTO.Rmd          # Presentación Beamer en R Markdown
-├── 📄 EXPOANALISISTEXTO.pdf          # Presentación PDF
+├── 📄 EXPOANALISISTEXTO.pdf          # ⭐ PDF de la exposición del proyecto
 ├── 📊 CustomStopWords.xlsx           # Lista de stopwords personalizadas
 ├── 📊 sentimientos_2.txt             # Diccionario de sentimientos UNALM
 ├── 📊 corpus_por_seccion.rds         # Corpus procesado por secciones
