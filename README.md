@@ -122,13 +122,8 @@ library(readxl)
 
 ## 👥 Autores
 
-| Nombre | Correo |
-|--------|--------|
-| Saavedra Quispe, Aaron Paolo | 20230702@lamolina.edu.pe |
-| Sánchez Cáceres, Danuska Brunela | 20250423@lamolina.pe |
 | Soto Ortega, Fiorella Belen | 20250426@lamolina.pe |
 | **Uraco Silva, Javier Anthony** | 20230414@lamolina.edu.pe |
-| Velásquez Fuero, Nicoly Dayana | 20220784@lamolina.edu.pe |
 
 ## 🏫 Información Académica
 
@@ -136,7 +131,6 @@ library(readxl)
 - **Departamento**: Estadística e Informática
 - **Curso**: Técnicas de Exploración de Datos
 - **Docente**: Jesús Salinas
-- **Ciclo**: 2025-II
 
 ## 📜 Licencia
 
