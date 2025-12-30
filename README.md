@@ -121,9 +121,7 @@ library(readxl)
    ```
 
 ## 👥 Autores
-
-| Soto Ortega, Fiorella Belen | 20250426@lamolina.pe |
-| **Uraco Silva, Javier Anthony** | 20230414@lamolina.edu.pe |
+Soto Ortega, Fiorella Belen & **Uraco Silva, Javier Anthony**
 
 ## 🏫 Información Académica
 
