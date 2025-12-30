@@ -1,0 +1,987 @@
+---
+title: "**Elecciones de rector y vicerrectores en la UNALM: minería de textos de la propuesta de plan de gestión 2026-2031 de “Renacer Molinero**”"
+author: "Saavedra, A. Sánchez, D. Soto, F. Uraco, J. Velásquez, N"
+date: "Grupo 6 - Técnicas de Exploración de Datos - 2025"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: cosmo
+    highlight: tango
+    code_folding: hide
+    css: styles.css
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = 'center',
+  fig.width = 12,
+  fig.height = 8,
+  dpi = 300
+)
+
+# Cargar librerías
+library(pacman)
+p_load(tidyverse, readr, knitr, readxl, pdftools, tm, tidytext, stopwords, widyr, wordcloud, RColorBrewer, ggraph, forcats, ggplot2, ggstance, scales, paletteer, igraph, ggrepel, widyr)
+```
+
+# **1. Introducción**
+La minería de datos es necesaria para extraer conocimientos de datos textuales no estructurados, es decir, textos que no se encuentran organizados de manera predeterminada. El proceso de extracción de conocimientos implica evaluar e interpretar los resultados obtenidos en la minería de textos. La minería de textos no tiene como objetivo buscar información, sino el usuario establece previamente lo que quiere  y utiliza la minería de textos para encontrar lo que necesita (Castro & Chávez, 2023).
+
+# **2. Objetivo**
+
+El objetivo es  extraer conocimientos de la propuesta de plan de gestión 2026-2031 de “Renacer Molinero”  utilizando la minería de datos. Asimismo realizar un estudio imparcial y objetivo de los resultados para identificar sus ejes temáticos y perfil  emocional.
+
+# **3. Metodología**
+El software que se utilizó fue la versión 4.0.5 de R y 1.4.1 de RStudio que proporciona las herramientas necesarias para la minería de textos, como lo son el uso de diversos paquetes adicionales los cuales permiten y facilitan tareas de limpieza y visualización de datos.
+
+El documento asignado para este trabajo inicialmente no era adecuado para analizarlo, por ende se aplicó minería de textos, este proceso incluyó:
+
+- Limpieza del documento
+- Tokenización del texto
+- Eliminación de stopwords
+- Estandarización de palabras (normalización)
+
+De la misma manera, se incorporó un análisis de sentimientos para identificar la      relación que existe entre palabras y emociones, para esta tarea se empleó el diccionario:  “Léxico de asociación palabra-emoción del NRC” con unas ligeras modificaciones adecuadas para el contexto del documento, este diccionario permitió asignar emocionar a cada palabra, posibilitando identificar correctamente la relación sentimiento-emoción dentro del análisis. 
+
+# **4. Preparación de datos**
+
+## 4.1 Lectura del PDF
+
+Se lee el PDF que contiene el plan de gestión, creándose un vector de carácteres, donde cada elemento de este corresponde a una página del PDF.
+
+```{r lectura, eval=FALSE}
+# Leer el archivo PDF y dividirlo en líneas individuales
+plan_crudo <- pdf_text("RENACER MOLINERO.pdf")
+plan_crudo <- unlist(strsplit(plan_crudo, "\n"))
+```
+
+## 4.2 Limpieza de los datos
+La limpieza se aplica a las observaciones que no aportan al análisis de la minería del texto: encabezados y subtítulos.
+
+```{r limpieza, eval=FALSE}
+# Eliminar encabezados y números de página
+plan_limpio_lineas <- plan_crudo[!grepl("PROPUESTA DE PLAN DE GESTIÓN", plan_crudo)]
+plan_limpio_lineas <- plan_limpio_lineas[!grepl("RENACER MOLINERO", plan_limpio_lineas)]
+plan_limpio_lineas <- plan_limpio_lineas[!grepl("^\\s*\\d+\\s*$", plan_limpio_lineas)]
+
+# Convertir a tibble y eliminar líneas vacías
+plan_df <- tibble(texto = plan_limpio_lineas) %>% 
+  filter(texto != "" & !grepl("^\\s*$", texto))
+```
+
+## 4.3 Segmentación por Secciones Temáticas
+
+```{r segmentacion, eval=FALSE}
+# Identificar las posiciones de cada subtítulo
+idx_gestion <- which(grepl("^\\s*2\\.1\\s+", plan_df$texto))
+idx_docente <- which(grepl("^\\s*2\\.2\\s+", plan_df$texto))
+# ... (código para todos los índices)
+
+# Extraer el contenido entre los índices para crear el corpus por secciones
+# ... (código de la función `extraer_seccion`)
+```
+
+## 4.4 Tokenización, eliminación de stopwords y normalización
+
+```{r tokenizacion, eval=FALSE}
+# Convertir a tibble, tokenizar y limpiar stopwords
+plan_tokens <- tibble(texto = texto_limpio) %>%
+  unnest_tokens(Token, texto) %>%
+  anti_join(stopwords_es, by = "Token")
+
+# Normalizar términos clave
+plan_limpio <- plan_tokens %>%
+  mutate(
+    Token = str_replace(Token, "universidad", "unalm"),
+    Token = str_replace(Token, "estudiantes", "estudiante")
+    # ... (resto de normalizaciones)
+  )
+```
+Se le da estructura a los datos, ahora se tiene que cada palabra del plan de gestión es una fila del tibble. Además, esta función de tokenización del tidytext, ha limpiado automáticamente los signos puntuales como los checks que están en la propuesta de plan de gestión, espacios en blanco, y ha coercionado las palabras a minúsculas. Fuera de ello se elimina los dígitos y los espacios en blanco que han generado estos.
+Luego, se elimina los stopwords o palabras vacías, ya que se quiere que el análisis se centre en las palabras con mayor carga de significado, tales como sustantivos, verbos y adjetivos. Se utilizó el diccionario  “Léxico de asociación palabra-emoción del NRC". Por último, en el proceso de normalización, se considera a palabras diferentes, pero semánticamente equivalentes. Por ejemplo plurales, conjugaciones o formas alternativas. 
+
+# **5. Análisis de frecuencias**
+
+## 5.1 Lollipop Chart
+```{r grafico-lollipop, echo=TRUE}
+# Cargar datos procesados
+plan_limpio <- readRDS("corpus_procesado.rds")
+
+# Calcular frecuencias
+frecuencias <- plan_limpio %>%
+  count(Token, sort = TRUE)
+
+# Generar gráfico lollipop con top 15 EXACTAS y estilo solicitado
+grafico_lollipop <- frecuencias %>%
+  slice_max(n, n = 15, with_ties = FALSE) %>%
+  ggplot(aes(x = fct_reorder(Token, n), y = n)) +
+  
+  geom_segment(aes(x = Token, xend = Token, y = 0, yend = n),
+               linewidth = 4,
+               color = "deepskyblue") +
+  
+  geom_point(size = 8, color = "deepskyblue") +
+  
+  geom_text(aes(label = n),
+            color = "white",
+            fontface = "bold",
+            size = 3.5) +
+  
+  labs(
+    x = NULL,
+    y = "Frecuencia",
+    title = "Top 15 palabras más frecuentes - RENACER MOLINERO",
+    subtitle = "Plan de Gobierno 2026-2031"
+  ) +
+  
+  coord_flip() +
+  
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line.x = element_line(linewidth = 1.2, color = "black"),
+    axis.text.y = element_text(size = 11),
+    axis.ticks.y = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.ticks.x = element_line(),
+    axis.title.x = element_text(size = 11),
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11)
+  )
+
+grafico_lollipop
+```
+
+En el gráfico se muestran las 15 palabras utilizadas con mayor frecuencia en la propuesta del plan de gestión de “Renacer Molinero””. Se aprecia que “unalm” es la palabra más utilizada, lo cual tiene coherencia con el contexto: elecciones de autoridades de la UNALM. Las palabras “fortaleceremos”, “estudiante” y “docente” ocupan los siguientes puestos, y además tienen la misma frecuencia. Estas palabras, incluyendo “unalm”, representan gran parte del eje temático del discurso.
+
+## 5.2 Word Cloud
+```{r wordcloud, echo=TRUE, fig.width=12, fig.height=9}
+# Cargar datos procesados
+plan_limpio <- readRDS("corpus_procesado.rds")
+
+# Calcular frecuencias
+frecuencias <- plan_limpio %>%
+  count(Token, sort = TRUE)
+
+# Filtrar la palabra "aún" de las frecuencias para el wordcloud
+frecuencias_wordcloud <- frecuencias %>%
+  filter(Token != "aún")
+
+# Generar WordCloud
+set.seed(2024)
+wordcloud(
+  words = frecuencias_wordcloud$Token,
+  freq = frecuencias_wordcloud$n,
+  min.freq = 2,
+  max.words = 150,
+  random.order = FALSE,
+  colors = brewer.pal(8, "Dark2"),
+  scale = c(4, 0.5)
+)
+```
+Para la nube de palabras se consideró un máximo de 150 palabras con una frecuencia mínima de 2 veces. El tamaño de cada palabra es proporcional a su frecuencia, además la variación de tamaño es acompañado por el cambio de color, permitiendo así visualizar rápidamente los temas centrales del plan de gestión. Se observa que “unalm” es la palabra con mayor frecuencia, en cambio, “seguridad”, “modernizaremos”, “laboratorio”, “proyectos”, entre otros; aparecen con el menor tamaño, es decir, corresponden a las palabras con menor frecuencia.  
+
+
+# **6. Análisis de sentimientos**
+
+Para evaluar el tono emocional del plan de gestión, se realizó un análisis de sentimientos. Este método asigna una o más emociones a cada palabra tomando de referencia un diccionario léxico, para este trabajo se empleó el diccionario “Léxico de asociación palabra-emoción del NRC”.Sin embargo, se realizó  ligeras modificaciones con el fin de tener una adecuada relación palabra-sentimiento para el contexto del discurso. 
+
+## 6.1 Gráfico de barras según sentimientos
+
+````{r distribucion-sentimientos, echo=TRUE}
+# Cargar datos y diccionario contextualizado
+plan_limpio <- readRDS("corpus_procesado.rds")
+sentimientos <- read.delim("sentimientos_2.txt") %>% as_tibble() %>% distinct()
+
+# Definir términos UNALM (igual que en tu script .R)
+terminos_unalm <- tibble(
+  palabra = c(
+    # Positivos - Gestión universitaria (37)
+    "fortalecer", "fortaleceremos", "modernizar", "modernizaremos",
+    "implementar", "implementaremos", "garantizar", "garantizaremos",
+    "promover", "promoveremos", "mejorar", "gestionar", "gestionaremos",
+    "defender", "defenderemos", "proteger", "protegeremos",
+    "incrementar", "desarrollar", "potenciar", "repotenciar",
+    "alianzas", "estrategicas", "acreditacion", "calidad",
+    "competitivos", "innovacion", "investigacion", "produccion",
+    "transparente", "autonomia", "participacion", "bienestar",
+    "excelencia", "formacion", "integral", "responsabilidad",
+    # Nuevos términos UNALM (16)
+    "sostenibilidad", "sostenible", "ambiental", "agrícola", "agro",
+    "agroecológica", "agroecológico", "agrario", "agraria",
+    "acreditación", "licenciamiento", "sunedu", "sineace",
+    "empleabilidad", "competitividad", "internacionalización",
+    # Negativos (11)
+    "vulnerar", "vulnerados", "deficit", "carencia",
+    "insuficiente", "limitado", "deterioro", "obsoleto",
+    "burocracia", "trámites", "demora",
+    # Técnicos → confianza (16)
+    "irds", "facultades", "pregrado", "posgrado", "epg",
+    "docente", "docentes", "estudiante", "estudiantes",
+    "rector", "decano", "universitario", "universitaria",
+    "egresados", "alumni", "graduados"
+  ),
+  sentimiento = c(
+    rep("positivo", 37),
+    rep("positivo", 16),
+    rep("negativo", 11),
+    rep("confianza", 16)
+  )
+)
+
+# Agregar ajustes personalizados de sentimientos
+palabras_modificadas <- tibble(
+  palabra = c(
+    "extranjero", "excelencia", "responsabilidad", "trabajo", "alto",
+    "compromiso", "música", "ejecución", "arte", "participación",
+    "vigilancia", "médico", "líneas", "inteligencia", "confianza",
+    "aprovechar", "rendición", "fondo", "artificial", "aplicación", "respeto"
+  ),
+  sentimiento = c(
+    "positivo", "positivo", "positivo", "positivo", "positivo",
+    "positivo", "premonición", "confianza", "premonición", "positivo",
+    "confianza", "positivo", "neutro", "neutro", "positivo",
+    "positivo", "confianza", "positivo", "neutro", "positivo", "positivo"
+  )
+)
+
+# Combinar diccionarios
+sentimientos_completo <- bind_rows(sentimientos, terminos_unalm) %>%
+  distinct(palabra, sentimiento, .keep_all = TRUE)
+
+# Eliminar versiones antiguas y agregar personalizadas
+sentimientos_completo <- sentimientos_completo %>%
+  filter(!palabra %in% palabras_modificadas$palabra)
+sentimientos_completo <- bind_rows(sentimientos_completo, palabras_modificadas) %>%
+  distinct(palabra, sentimiento, .keep_all = TRUE)
+
+# Aplicar análisis de sentimientos
+plan_sentimientos <- plan_limpio %>% 
+  inner_join(sentimientos_completo, by = c("Token" = "palabra"))
+
+# Contar sentimientos
+conteo_sentimientos <- plan_sentimientos %>% 
+  count(sentimiento, sort = TRUE)
+
+# === AGREGADO: definir colores personalizados ===
+colores_sentimientos <- c(
+  "positivo"     = "#4CAF50",
+  "negativo"     = "#F44336",
+  "confianza"    = "#2196F3",
+  "anticipación" = "#FF9800", 
+  "premonición"  = "#FF9800",
+  "alegría"      = "#FFEB3B", 
+  "asombro"      = "#9C27B0", 
+  "sorpresa"     = "#9C27B0",
+  "enojo"        = "#E91E63", 
+  "ira"          = "#E91E63",
+  "tristeza"     = "#607D8B",
+  "miedo"        = "#795548",
+  "disgusto"     = "#8BC34A",
+  "neutro"       = "#9E9E9E" 
+)
+
+# Generar gráfico
+grafico_sentimientos <- conteo_sentimientos %>% 
+  ggplot(aes(x = fct_reorder(sentimiento, n), y = n, fill = sentimiento)) + 
+  geom_col(show.legend = FALSE) + 
+  geom_text(aes(label = n), 
+            hjust = -0.2, 
+            size = 4, 
+            fontface = "bold") +
+  coord_flip() +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+  labs(
+    title = "Distribución de sentimientos - RENACER MOLINERO",
+    subtitle = "Análisis de emociones en el plan de gobierno",
+    x = "Sentimiento",
+    y = "Frecuencia"
+  ) +
+  scale_fill_manual(values = colores_sentimientos) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    axis.text.y = element_text(size = 10)
+  )
+
+grafico_sentimientos
+````
+
+## 6.2 Tabla de frecuencia y porcentaje según sentimientos
+```{r tabla-sentimientos, echo=FALSE}
+conteo_sentimientos <- plan_sentimientos %>% 
+  count(sentimiento, sort = TRUE) %>% 
+  mutate(Porcentaje = round(n / sum(n) * 100, 1))
+
+knitr::kable(conteo_sentimientos,
+             col.names = c("Sentimiento", "Frecuencia", "% del total"),
+             caption = "Distribución de sentimientos detectados en el documento",
+             align = c("l", "c", "c"))
+```
+
+En el gráfico los sentimientos están ordenados según su frecuencia, se puede observar que principalmente el tono del discurso es positivo, en cambio, se evitan palabras que transmitan disgusto. Por otro lado, a partir de la tabla se concluye que el tono principal del discurso es positivo y emite confianza, ya que más del 70% de las palabras están relacionadas con estos sentimientos. 
+
+## 6.3 Ranking de palabras por sentimiento
+```{r top-palabras-sentimiento, fig.height=10}
+# Cargar datos y diccionario contextualizado
+plan_limpio <- readRDS("corpus_procesado.rds")
+sentimientos <- read.delim("sentimientos_2.txt") %>% as_tibble() %>% distinct()
+
+# Definir términos UNALM (igual que en tu script .R)
+terminos_unalm <- tibble(
+  palabra = c(
+    # Positivos - Gestión universitaria (37)
+    "fortalecer", "fortaleceremos", "modernizar", "modernizaremos",
+    "implementar", "implementaremos", "garantizar", "garantizaremos",
+    "promover", "promoveremos", "mejorar", "gestionar", "gestionaremos",
+    "defender", "defenderemos", "proteger", "protegeremos",
+    "incrementar", "desarrollar", "potenciar", "repotenciar",
+    "alianzas", "estrategicas", "acreditacion", "calidad",
+    "competitivos", "innovacion", "investigacion", "produccion",
+    "transparente", "autonomia", "participacion", "bienestar",
+    "excelencia", "formacion", "integral", "responsabilidad",
+    # Nuevos términos UNALM (16)
+    "sostenibilidad", "sostenible", "ambiental", "agrícola", "agro",
+    "agroecológica", "agroecológico", "agrario", "agraria",
+    "acreditación", "licenciamiento", "sunedu", "sineace",
+    "empleabilidad", "competitividad", "internacionalización",
+    # Negativos (11)
+    "vulnerar", "vulnerados", "deficit", "carencia",
+    "insuficiente", "limitado", "deterioro", "obsoleto",
+    "burocracia", "trámites", "demora",
+    # Técnicos → confianza (16)
+    "irds", "facultades", "pregrado", "posgrado", "epg",
+    "docente", "docentes", "estudiante", "estudiantes",
+    "rector", "decano", "universitario", "universitaria",
+    "egresados", "alumni", "graduados"
+  ),
+  sentimiento = c(
+    rep("positivo", 37),
+    rep("positivo", 16),
+    rep("negativo", 11),
+    rep("confianza", 16)
+  )
+)
+
+# Agregar ajustes personalizados de sentimientos
+palabras_modificadas <- tibble(
+  palabra = c(
+    "extranjero", "excelencia", "responsabilidad", "trabajo", "alto",
+    "compromiso", "música", "ejecución", "arte", "participación",
+    "vigilancia", "médico", "líneas", "inteligencia", "confianza",
+    "aprovechar", "rendición", "fondo", "artificial", "aplicación", "respeto"
+  ),
+  sentimiento = c(
+    "positivo", "positivo", "positivo", "positivo", "positivo",
+    "positivo", "premonición", "confianza", "premonición", "positivo",
+    "confianza", "positivo", "neutro", "neutro", "positivo",
+    "positivo", "confianza", "positivo", "neutro", "positivo", "positivo"
+  )
+)
+
+# Combinar diccionarios
+sentimientos_completo <- bind_rows(sentimientos, terminos_unalm) %>%
+  distinct(palabra, sentimiento, .keep_all = TRUE)
+
+# Eliminar versiones antiguas y agregar personalizadas
+sentimientos_completo <- sentimientos_completo %>%
+  filter(!palabra %in% palabras_modificadas$palabra)
+sentimientos_completo <- bind_rows(sentimientos_completo, palabras_modificadas) %>%
+  distinct(palabra, sentimiento, .keep_all = TRUE)
+
+# Aplicar análisis de sentimientos
+plan_sentimientos <- plan_limpio %>% 
+  inner_join(sentimientos_completo, by = c("Token" = "palabra"))
+
+# AHORA: Seleccionar TOP 5 palabras por sentimiento (cambio clave)
+top_palabras_sentimiento_facetas <- plan_sentimientos %>%
+  count(sentimiento, Token, sort = TRUE) %>%
+  group_by(sentimiento) %>%
+  slice_max(n, n = 5, with_ties = FALSE) %>%
+  ungroup()
+
+# Definir colores (actualizado con "neutro")
+colores_sentimientos <- c(
+  "positivo"     = "#4CAF50",
+  "negativo"     = "#F44336",
+  "confianza"    = "#2196F3",
+  "anticipación" = "#FF9800", 
+  "premonición"  = "#FF9800",
+  "alegría"      = "#FFEB3B", 
+  "asombro"      = "#9C27B0", 
+  "sorpresa"     = "#9C27B0",
+  "enojo"        = "#E91E63", 
+  "ira"          = "#E91E63",
+  "tristeza"     = "#607D8B",
+  "miedo"        = "#795548",
+  "disgusto"     = "#8BC34A",
+  "neutro"       = "#9E9E9E"
+)
+
+# Generar gráfico
+grafico_palabras_sentimiento_facetas <- top_palabras_sentimiento_facetas %>%
+  ggplot(aes(x = n, 
+             y = reorder_within(Token, n, sentimiento), 
+             fill = sentimiento)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), 
+            hjust = -0.2, 
+            size = 4, 
+            fontface = "bold") +
+  facet_wrap(~sentimiento, scales = "free_y", ncol = 4) +
+  scale_y_reordered() +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_manual(values = colores_sentimientos) +
+  labs(title = "Top 5 palabras por sentimiento - RENACER MOLINERO",
+       subtitle = "Análisis detallado de emociones por palabra",
+       x = "Frecuencia",
+       y = NULL) +
+  theme_minimal() +
+  theme(
+    strip.background = element_rect(fill = "gray85", color = NA),
+    strip.text = element_text(face = "bold", size = 9),
+    axis.text.y = element_text(size = 8),
+    panel.spacing = unit(1, "lines"),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5)
+  )
+
+grafico_palabras_sentimiento_facetas
+```
+
+Esta visualización permite apreciar las cinco palabras con mayor frecuencia según las categorías de sentimiento. El plan de gestión tiene un tono positivo principalmente por el uso de las palabras “fortaleceremos”, “investigación”, “promoveremos”, “participación” y “formación”. Por otro lado, el discurso logra transmitir confianza apoyándose principalmente en los siguientes términos: “estudiante”, “docente”, “sistema”, “nivel” y “facultades”, la relación entre palabra-sentimiento es coherente porque demuestra que el discurso de “Renacer Molinero” tiene muy presente los agentes que representan una gran parte de la comunidad universitaria, estudiante y docente, lo cual transmite confianza. 
+
+# **7. Análisis de bigramas y relaciones**
+
+## 7.1 Bigramas más Frecuentes
+```{r bigramas-frecuentes, fig.cap="Top 15 bigramas más frecuentes en el plan de gobierno", echo=TRUE}
+# Cargar corpus general
+plan_gobierno <- readLines("texto_limpio.txt", warn = FALSE)
+
+# Cargar stopwords
+stopwords_nltk <- tibble(Token = stopwords::stopwords("es", source = "nltk"))
+if(file.exists("CustomStopWords.xlsx")) {
+  stopwords_custom <- readxl::read_excel("CustomStopWords.xlsx")
+  names(stopwords_custom)[1] <- "Token"
+} else {
+  stopwords_custom <- tibble(Token = character())
+}
+stopwords_tecnicas <- tibble(Token = c("mm", "cm", "km", "etc", "ej", "pág", "pp", "n", "ª", "°"))
+stopwords_es <- bind_rows(stopwords_nltk, stopwords_custom, stopwords_tecnicas) %>% distinct(Token)
+
+# Reconstruir texto y generar bigramas
+texto_para_bigramas <- paste(plan_gobierno, collapse = " ")
+plan_bigramas <- tibble(texto = texto_para_bigramas) %>%
+  unnest_tokens(bigrama, texto, token = "ngrams", n = 2)
+
+bigramas_separados <- plan_bigramas %>%
+  separate(bigrama, c("palabra1", "palabra2"), sep = " ") %>%
+  filter(!palabra1 %in% stopwords_es$Token) %>%
+  filter(!palabra2 %in% stopwords_es$Token) %>%
+  filter(str_length(palabra1) > 2) %>%
+  filter(str_length(palabra2) > 2)
+
+# Filtrar bigramas que contengan "resolución" y contar
+top_bigramas <- bigramas_separados %>%
+  filter(palabra1 != "resolución" & palabra2 != "resolución") %>%
+  count(palabra1, palabra2, sort = TRUE) %>%
+  unite(bigrama, palabra1, palabra2, sep = " ") %>%
+  head(15)
+
+# Generar gráfico
+library(ggplot2)
+
+grafico_bigramas <- top_bigramas %>%
+  ggplot(aes(x = n, y = reorder(bigrama, n), fill = n)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_gradient(low = "lightblue", high = "steelblue") +
+  labs(
+    title = "Top 15 bigramas más frecuentes - RENACER MOLINERO",
+    subtitle = "Pares de palabras que aparecen juntas",
+    x = "Frecuencia",
+    y = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    axis.text.y = element_text(size = 9)
+  )
+
+grafico_bigramas
+```
+
+En el gráfico se observan los 15 bigramas más mencionados a lo largo del discurso, estos permiten identificar los temas principales de las propuestas y plan de gestión. Se aprecia que "responsabilidad social", "formación académica" y "alianzas estratégicas" son los más frecuentes, lo que brinda un enfoque tanto institucional como de vinculación externa al documento. Además destacan otros bigramas que están vinculados a la identidad universitaria, estos siendo: "comunidad universitaria" y "comunidad molinera". Finalmente, términos como "proyección social", "actividades culturales" y "instituciones públicas" muestran una visión clara de lazos externos y cooperación interinstitucional para la universidad. Estos bigramas en conjunto revelan un discurso centrado en gestión académica, identidad molinera y creación de vínculos estratégicos con el entorno.
+
+## 7.2 Red de Bigramas
+```{r red-bigramas, echo=TRUE, fig.height=10}
+# Cargar corpus general
+plan_gobierno <- readLines("texto_limpio.txt", warn = FALSE)
+
+# Cargar stopwords (como en el script original)
+stopwords_nltk <- tibble(Token = stopwords::stopwords("es", source = "nltk"))
+if(file.exists("CustomStopWords.xlsx")) {
+  stopwords_custom <- readxl::read_excel("CustomStopWords.xlsx")
+  names(stopwords_custom)[1] <- "Token"
+} else {
+  stopwords_custom <- tibble(Token = character())
+}
+stopwords_tecnicas <- tibble(Token = c("mm", "cm", "km", "etc", "ej", "pág", "pp", "n", "ª", "°"))
+stopwords_es <- bind_rows(stopwords_nltk, stopwords_custom, stopwords_tecnicas) %>% distinct(Token)
+
+# Reconstruir texto y generar bigramas
+texto_para_bigramas <- paste(plan_gobierno, collapse = " ")
+plan_bigramas <- tibble(texto = texto_para_bigramas) %>%
+  unnest_tokens(bigrama, texto, token = "ngrams", n = 2)
+
+bigramas_separados <- plan_bigramas %>%
+  separate(bigrama, c("palabra1", "palabra2"), sep = " ") %>%
+  filter(!palabra1 %in% stopwords_es$Token) %>%
+  filter(!palabra2 %in% stopwords_es$Token) %>%
+  filter(str_length(palabra1) > 2) %>%
+  filter(str_length(palabra2) > 2)
+
+# Contar bigramas y filtrar los más frecuentes para la red
+# Excluir bigramas que contengan "resolución"
+bigramas_red <- bigramas_separados %>%
+  filter(palabra1 != "resolución" & palabra2 != "resolución") %>%
+  count(palabra1, palabra2, sort = TRUE) %>%
+  filter(n > 2) %>%          # Solo bigramas con frecuencia > 2
+  head(50)                   # Máximo 50 conexiones
+
+# Crear grafo y red
+set.seed(2024)
+grafo_bigramas <- bigramas_red %>%
+  graph_from_data_frame()
+
+grafico_red_bigramas <- ggraph(grafo_bigramas, layout = "fr") +
+  geom_edge_link(
+    aes(edge_alpha = n),
+    arrow = arrow(type = "closed", length = unit(2, "mm")),
+    end_cap = circle(3, "mm"),
+    edge_colour = "steelblue"
+  ) +
+  geom_node_point(color = "darkblue", size = 5) +
+  geom_node_text(aes(label = name), repel = TRUE, size = 3.5, fontface = "bold") +
+  labs(
+    title = "Red de bigramas - RENACER MOLINERO",
+    subtitle = "Conexiones entre palabras que aparecen juntas"
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+grafico_red_bigramas
+```
+
+En la red de bigramas se identifican las conexiones más frecuentes del discurso mediante flechas que van de un color más intenso (más repetidas) a uno menor (menos repetidas). Se observa que “unalm resolución” y “responsabilidad social” destacan por su mayor frecuencia, evidenciando un color más intenso. Destacan también “actividades culturales” y “recursos necesarios” que muestran objetivos de mayor acción en el plan. También destacan “proyección social” e “instituciones públicas” que muestran intención de mayor conexión con el entorno.Asímismo, términos como “formación académica”, “facultad fortaleceremos”, “comunidad universitaria” y “comunidad molinera” dan idea de un fortalecimiento académico.
+
+# **8. Análisis por sección temática**
+
+## 8.1 Palabras Características por Sección (TF-IDF)
+
+```{r tfidf-por-seccion, fig.height=12}
+# Cargar corpus por secciones
+plan_limpio_por_seccion <- readRDS("corpus_por_seccion.rds")
+
+# Calcular TF-IDF
+plan_tfidf <- plan_limpio_por_seccion %>%
+  count(seccion, Token) %>%
+  bind_tf_idf(Token, seccion, n) %>%
+  arrange(desc(tf_idf))
+
+# Seleccionar TOP 5 por sección (¡cambio clave aquí!)
+tfidf_propuestas <- plan_tfidf %>%
+  group_by(seccion) %>%
+  slice_max(tf_idf, n = 5, with_ties = FALSE) %>%  # ← AHORA ES 5
+  ungroup()
+
+# Definir colores para las 11 secciones
+colores_secciones <- c(
+  "#E74C3C", "#3498DB", "#2ECC71", "#F39C12", 
+  "#9B59B6", "#1ABC9C", "#E67E22", "#34495E",
+  "#16A085", "#C0392B", "#8E44AD"
+)
+
+# Generar gráfico
+grafico_tfidf <- tfidf_propuestas %>%
+  ggplot(aes(x = tf_idf,
+             y = reorder_within(Token, tf_idf, seccion),
+             fill = seccion)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~seccion, scales = "free_y", ncol = 3) +
+  scale_y_reordered() +
+  scale_fill_manual(values = colores_secciones) +
+  labs(title = "Palabras características por propuesta (TF-IDF)",
+       subtitle = "Términos distintivos de cada sección del plan de gobierno",
+       x = "TF-IDF (importancia relativa)",
+       y = NULL) +
+  theme_minimal() +
+  theme(
+    strip.background = element_rect(fill = "#2C3E50", color = NA),
+    strip.text = element_text(face = "bold", size = 9, color = "white"),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(size = 8),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5)
+  )
+
+grafico_tfidf
+```
+Recuerde que el plan de gestión cuenta con 10 secciones que contienen diferentes temas. El gráfico que se presenta busca encontrar las palabras más características en cada sección del discurso.
+El método para la construcción del gráfico es calcular el valor TF (Term Frequency) para cada palabra en cada sección, si la frecuencia de la palabra es mayor en esa sección, entonces mayor será su TF. Por otro lado, se calcula el valor de IDF (Inverse Document Frequency), mientras más frecuente sea la palabra en las demás secciones, menor será su IDF. El valor de TF-IDF es el producto del TF y el IDF de cada palabra en cada sección, será mayor si la palabra es frecuente en esa sección y además rara en las demás. Así que las palabras más características de cada sección tendrán los mayores valores de TF-IDF. Por ejemplo, la palabra más importante en la sección Personal no docente es “derechos”.
+
+
+## 8.2 Evolución de Palabras Clave
+```{r evolucion-palabras, echo=TRUE}
+# Cargar corpus por secciones
+plan_limpio_por_seccion <- readRDS("corpus_por_seccion.rds")
+
+# Definir el orden lógico de las secciones (igual que en tu script)
+nombres_secciones <- c(
+  "Principios y Valores",
+  "Gestión Institucional",
+  "Personal Docente",
+  "Estudiantes",
+  "Personal No Docente",
+  "Proceso Aprendizaje-Enseñanza",
+  "Investigación",
+  "Responsabilidad Social",
+  "Innovación y Transferencia",
+  "Recursos Financieros",
+  "Seguridad"
+)
+
+orden_secciones <- tibble(
+  seccion = nombres_secciones,
+  orden = 1:length(nombres_secciones)
+)
+
+# Palabras clave a trackear (exactas del script)
+palabras_trackear <- c("unalm", "gestión", "investigación", 
+                       "estudiante", "docente", "desarrollo")
+
+# Calcular frecuencia por sección
+evolucion_palabras <- plan_limpio_por_seccion %>%
+  filter(Token %in% palabras_trackear) %>%
+  count(seccion, Token) %>%
+  left_join(orden_secciones, by = "seccion")
+
+# === AGREGADO: definir colores institucionales UNALM ===
+colores_unalm <- c(
+  "unalm"         = "#458e5d",
+  "gestión"       = "#8f5444",
+  "investigación" = "#db241c",
+  "estudiante"    = "#3482d4",
+  "docente"       = "#fff700",
+  "desarrollo"    = "#181414"
+)
+
+# Generar gráfico
+grafico_evolucion <- evolucion_palabras %>%
+  ggplot(aes(x = orden, y = n, color = Token, group = Token)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 3) +
+  scale_x_continuous(
+    breaks = 1:length(nombres_secciones),
+    labels = function(x) {
+      sapply(x, function(i) {
+        if(i <= length(nombres_secciones)) {
+          nombre <- nombres_secciones[i]
+          if(nchar(nombre) > 15) {
+            palabras <- strsplit(nombre, " ")[[1]]
+            paste(substr(palabras, 1, 4), collapse = ".")
+          } else {
+            nombre
+          }
+        } else ""
+      })
+    }
+  ) +
+  scale_color_manual(values = colores_unalm) +  # ← ÚNICO CAMBIO DE COLOR
+  labs(title = "Evolución de palabras clave por propuesta",
+       subtitle = "Tracking de términos importantes en cada sección",
+       x = "Sección del plan de gobierno", 
+       y = "Frecuencia", 
+       color = "Palabra") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  )
+
+grafico_evolucion
+```
+
+En el gráfico se ve que “investigación” marca su punto más alto en su sección homónima, dejando claro que el plan gira alrededor de la producción científica. “Gestión” también presenta un pico en esa parte, mostrando que el enfoque de investigación está pensado desde lo institucional y administrativo. Adicionalmente, términos como “docente” y “desarrollo” se mantienen estables, con leves picos en “Pare Doce” y “Gest Inst”, brindado la idea de que el plan combina gestión y fortalecimiento del personal.
+
+## 8.3 Sentimientos por Sección
+```{r sentimientos-por-seccion, echo=TRUE}
+# Cargar corpus por secciones y diccionario de sentimientos
+plan_limpio_por_seccion <- readRDS("corpus_por_seccion.rds")
+sentimientos <- read.delim("sentimientos_2.txt") %>%
+  as_tibble() %>%
+  distinct()
+
+# Definir términos UNALM y ajustes personalizados (igual que en tu script)
+terminos_unalm <- tibble(
+  palabra = c(
+    "fortalecer", "fortaleceremos", "modernizar", "modernizaremos",
+    "implementar", "implementaremos", "garantizar", "garantizaremos",
+    "promover", "promoveremos", "mejorar", "gestionar", "gestionaremos",
+    "defender", "defenderemos", "proteger", "protegeremos",
+    "incrementar", "desarrollar", "potenciar", "repotenciar",
+    "alianzas", "estrategicas", "acreditacion", "calidad",
+    "competitivos", "innovacion", "investigacion", "produccion",
+    "transparente", "autonomia", "participacion", "bienestar",
+    "excelencia", "formacion", "integral", "responsabilidad",
+    "sostenibilidad", "sostenible", "ambiental", "agrícola", "agro",
+    "agroecológica", "agroecológico", "agrario", "agraria",
+    "acreditación", "licenciamiento", "sunedu", "sineace",
+    "empleabilidad", "competitividad", "internacionalización",
+    "vulnerar", "vulnerados", "deficit", "carencia",
+    "insuficiente", "limitado", "deterioro", "obsoleto",
+    "burocracia", "trámites", "demora",
+    "irds", "facultades", "pregrado", "posgrado", "epg",
+    "docente", "docentes", "estudiante", "estudiantes",
+    "rector", "decano", "universitario", "universitaria",
+    "egresados", "alumni", "graduados"
+  ),
+  sentimiento = c(
+    rep("positivo", 37),
+    rep("positivo", 16),
+    rep("negativo", 11),
+    rep("confianza", 16)
+  )
+)
+
+palabras_modificadas <- tibble(
+  palabra = c(
+    "extranjero", "excelencia", "responsabilidad", "trabajo", "alto",
+    "compromiso", "música", "ejecución", "arte", "participación",
+    "vigilancia", "médico", "líneas", "inteligencia", "confianza",
+    "aprovechar", "rendición", "fondo", "artificial", "aplicación", "respeto"
+  ),
+  sentimiento = c(
+    "positivo", "positivo", "positivo", "positivo", "positivo",
+    "positivo", "premonición", "confianza", "premonición", "positivo",
+    "confianza", "positivo", "neutro", "neutro", "positivo",
+    "positivo", "confianza", "positivo", "neutro", "positivo", "positivo"
+  )
+)
+
+# Combinar diccionarios
+sentimientos_completo <- bind_rows(sentimientos, terminos_unalm) %>%
+  distinct(palabra, sentimiento, .keep_all = TRUE)
+sentimientos_completo <- sentimientos_completo %>%
+  filter(!palabra %in% palabras_modificadas$palabra)
+sentimientos_completo <- bind_rows(sentimientos_completo, palabras_modificadas) %>%
+  distinct(palabra, sentimiento, .keep_all = TRUE)
+
+# Aplicar análisis de sentimientos por sección
+sentimientos_por_seccion <- plan_limpio_por_seccion %>%
+  inner_join(sentimientos_completo, by = c("Token" = "palabra")) %>%
+  count(seccion, sentimiento)
+
+# Definir orden de secciones
+nombres_secciones <- c(
+  "Principios y Valores",
+  "Gestión Institucional",
+  "Personal Docente",
+  "Estudiantes",
+  "Personal No Docente",
+  "Proceso Aprendizaje-Enseñanza",
+  "Investigación",
+  "Responsabilidad Social",
+  "Innovación y Transferencia",
+  "Recursos Financieros",
+  "Seguridad"
+)
+orden_secciones <- tibble(seccion = nombres_secciones, orden = 1:length(nombres_secciones))
+sentimientos_por_seccion <- sentimientos_por_seccion %>%
+  left_join(orden_secciones, by = "seccion")
+
+# === AGREGADO: definir colores personalizados ===
+colores_sentimientos <- c(
+  "positivo"     = "#4CAF50",
+  "negativo"     = "#F44336",
+  "confianza"    = "#2196F3",
+  "anticipación" = "#FF9800", 
+  "premonición"  = "#FF9800",
+  "alegría"      = "#FFEB3B", 
+  "asombro"      = "#9C27B0", 
+  "sorpresa"     = "#9C27B0",
+  "enojo"        = "#E91E63", 
+  "ira"          = "#E91E63",
+  "tristeza"     = "#607D8B",
+  "miedo"        = "#795548",
+  "disgusto"     = "#8BC34A",
+  "neutro"       = "#9E9E9E" 
+)
+
+# Generar gráfico
+grafico_sentimientos_propuesta <- sentimientos_por_seccion %>%
+  ggplot(aes(x = reorder(seccion, orden), y = n, fill = sentimiento)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_manual(values = colores_sentimientos) +  # ← ÚNICO CAMBIO DE COLOR
+  labs(title = "Distribución de sentimientos por propuesta",
+       subtitle = "Proporción de emociones en cada sección del plan",
+       x = NULL,
+       y = "Proporción",
+       fill = "Sentimiento") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    legend.position = "right"
+  )
+
+grafico_sentimientos_propuesta
+```
+
+Esta visualización muestra cómo varían las emociones en cada sección del plan y deja ver que el tono general es claramente positivo y de confianza. Es notable que, en secciones como “Investigación” y “Personal No Docente” aparece una proporción mayor de asombro y premonición, lo que sugiere que esas partes del plan plantean cambios que llaman la atención. La única sección que no sigue esta tendencia es “Seguridad”, donde predominan emociones como miedo y negativo, algo coherente porque aborda problemas que el plan pretende solucionar. En conjunto, la combinación de estas emociones permite entender cómo “Renacer Molinero” organiza su mensaje, resaltando optimismo y seguridad.
+
+# **9. Análisis de correlaciones**
+
+## 9.1 Red de Correlaciones
+```{r red-correlaciones, echo=TRUE, fig.height=10}
+# Cargar stopwords
+stopwords_nltk <- tibble(Token = stopwords::stopwords("es", source = "nltk"))
+if(file.exists("CustomStopWords.xlsx")) {
+  stopwords_custom <- readxl::read_excel("CustomStopWords.xlsx")
+  names(stopwords_custom)[1] <- "Token"
+} else {
+  stopwords_custom <- tibble(Token = character())
+}
+stopwords_tecnicas <- tibble(Token = c("mm", "cm", "km", "etc", "ej", "pág", "pp", "n", "ª", "°"))
+stopwords_es <- bind_rows(stopwords_nltk, stopwords_custom, stopwords_tecnicas) %>% distinct(Token)
+
+# Leer texto limpio y tokenizar por líneas
+plan_lineas <- tibble(texto = scan("texto_limpio.txt", what = "character", sep = "\n", quiet = TRUE)) %>%
+  mutate(linea = row_number()) %>%
+  unnest_tokens(Token, texto) %>%
+  anti_join(stopwords_es, by = "Token") %>%
+  filter(str_length(Token) > 2)
+
+# Calcular correlaciones (phi) entre palabras
+correlaciones_palabras <- plan_lineas %>%
+  group_by(Token) %>%
+  filter(n() >= 5) %>%  # Solo palabras con ≥5 apariciones
+  pairwise_cor(Token, linea, sort = TRUE)
+
+# Generar red de correlaciones
+set.seed(2024)
+
+grafico_correlaciones <- correlaciones_palabras %>%
+  filter(correlation > 0.15) %>%
+  head(50) %>%
+  graph_from_data_frame() %>%
+  ggraph(layout = "fr") +
+  geom_edge_link(
+    aes(edge_alpha = correlation, edge_width = correlation),
+    edge_colour = "steelblue"
+  ) +
+  geom_node_point(size = 6, color = "#fff700") +  # ← ÚNICO CAMBIO: ahora es amarillo
+  geom_node_text(aes(label = name), repel = TRUE, size = 3.5, fontface = "bold") +
+  theme_void() +
+  labs(
+    title = "Red de correlaciones entre palabras - RENACER MOLINERO",
+    subtitle = "Palabras que tienden a aparecer juntas en el documento"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+grafico_correlaciones
+```
+
+En la red de correlaciones entre palabras se identifican claramente los grupos que aparecen juntos con mayor frecuencia dentro del documento. El nexo más fuerte está formado por “alianzas privadas”, “públicas” e “instituciones”, unidos a “fortaleceremos”, lo que refleja que una idea principal del discurso es la cooperación y la asociación con externos. Otro nexo relevante es el formado por “actividades”, “a través” y “promoveremos”, que muestra un compromiso de acciones concretas. También destacan los pares “estudiantes – docentes”, “unalm – resolución”, y el bloque asociado a “calidad académica”, que se conecta con términos como “responsabilidad social” y “formación”, indicando compromiso institucional. A diferencia de los bigramas, que muestran combinaciones textuales exactas, la red de correlaciones revela relaciones conceptuales más profundas entre palabras que tienden a aparecer juntas.
+
+# **10. Conclusiones**
+En este estudio se analizó el plan de gestión 2026-2031 de “Renacer Molinero” utilizando las diversas técnicas de minería de textos con el fin extraer conocimientos de un dato no estructurado. El software que se utilizó fue R y RStudio que proporcionó las herramientas necesarias para la minería de textos. En los primeros resultados del análisis se observa que las palabras más utilizadas en el discurso es “unalm”, “fortaleceremos”, “estudiante” y “docente”, en cambio, “seguridad”, “modernizaremos”, “laboratorio”, “proyectos”, entre otros; corresponden a las palabras con menor frecuencia. Siguiendo con el análisis, se evaluó el tono emocional del plan de gestión asignando una emoción a cada palabra. En el estudio, se observó que más del 70% de las palabras se relacionan con un tono positivo o transmiten confianza, encontrando así el tono central del discurso. 
+
+Para la sección de bigramas más frecuentes, estos mostraron que las propuestas se centraron en los términos “unalm resolución”,  “responsabilidad social”, “formación académica” y distintas referencias a la comunidad universitaria, esto reveló que existe un énfasis en la identidad molinera y el desarrollo de futuros proyectos formativos. Se identificó que con conceptos como “alianzas estratégicas”, “proyección social” e “instituciones públicas” indicaron la tendencia hacia vínculos externos y cooperación.
+
+Por otro lado, en el análisis por secciones, palabras como “investigación”, “gestión”, “docente” y “desarrollo” son las de mayor relevancia, mostrando que el discurso otorgó un peso importante al desarrollo científico y a la administración de la universidad. De esta misma manera, se evidenció el tono emocional causado a lo largo del discurso, en este predominó un sentimiento positivo y de confianza en la mayor parte del discurso, además las emociones como asombro y premonición se mostraron al mencionar planes de realizar cambios más ambiciosos, y términos con relación al miedo surgieron al mencionar la sección de “Seguridad”. Por último, las correlaciones entre palabras revelaron la existencia de relaciones conceptuales más profundas, evidenciando uniones sólidas entre alianzas y acciones como el “fortalecimiento”, esto confirmó que el plan se construyó con ideas y propuestas que están orientadas a la cooperación, a las acciones puntuales y al desarrollo tanto institucional como profesional. 
+
+# **11. Sugerencias: Observaciones críticas**
+Siguiendo el carácter imparcial y objetivo del estudio, a continuación se presentan sugerencias que toman como base la interpretación y análisis de los conocimientos obtenidos con la minería de textos.   
+
+En primer lugar, se observa que la palabra “sostenibilidad” se menciona solo una vez en todo el discurso; además al examinar la nube de palabras generado en “Análisis de frecuencias” las palabras de mayor tamaño, que representan a las palabras con mayor frecuencia, no guardan relación con este término. Se recomienda integrar “sostenibilidad”, y sus derivados, con mayor frecuencia, ya que está estrechamente relacionado con la palabra más frecuente, “unalm”, asimismo aportaría nuevos bigramas; por ejemplo “gestión sostenible”, “desarrollo sostenible”, entre otros. Por otro lado, en una reciente reunión del Ministerio de Salud (Minsa) y el Ministerio de Educación (Minedu) se reafirmó la importancia de fortalecer la salud mental de la comunidad universitaria. En el discurso de “Renacer molinero” no se encontró  ninguna palabra relacionada con la salud mental, por ello recomendamos agregar una sección relacionada a este tema. 
+
+# **12. Apéndices**
+
+## 12.1 Apéndice A: Metodología Detallada
+
+#### Flujo de Trabajo
+1.  **Extracción y Limpieza**: Se extrajo el texto del PDF, eliminando elementos de formato pero preservando los subtítulos para la segmentación en 11 ejes temáticos.
+2.  **Tokenización**: El texto se dividió en palabras (tokens), filtrando stopwords mediante un diccionario de tres capas (NLTK, personalizado, técnico).
+3.  **Contextualización**: Se enriqueció el léxico NRC con 80 términos relevantes para el contexto universitario (ej. "acreditación" = positivo), aumentando la precisión del análisis emocional.
+
+#### Explicación de Métricas
+-   **TF-IDF**: Identifica las palabras más **distintivas** de cada sección, penalizando aquellas que se repiten en todo el documento.
+-   **Correlación phi (φ)**: Mide la fuerza de asociación entre dos palabras que aparecen en la misma línea de texto.
+
+## 12.2 Apéndice B: Recursos del Análisis
+
+#### Muestra de Stopwords Personalizadas
+```{r apendice-stopwords, echo=FALSE}
+if(file.exists("CustomStopWords.xlsx")) {
+  stopwords_custom_full <- read_excel("CustomStopWords.xlsx")
+  names(stopwords_custom_full) <- c("Token", "Fuente")
+  knitr::kable(head(stopwords_custom_full, 10), caption = "Primeras 10 stopwords personalizadas")
+} else {
+  cat("Se utilizaron stopwords estándar y técnicas (mm, cm, pág, etc).")
+}
+```
+
+#### Resumen del Diccionario Contextualizado UNALM
+```{r apendice-diccionario, echo=FALSE}
+# Resumen simple de los términos agregados manualmente
+resumen_terminos <- terminos_unalm %>%
+  group_by(sentimiento) %>%
+  summarise(
+    `Cantidad` = n(),
+    `Ejemplos` = paste(head(palabra, 3), collapse = ", ")
+  )
+
+knitr::kable(resumen_terminos,
+             caption = "Términos específicos de la UNALM agregados al diccionario",
+             align = c("l", "c", "l"))
+```
+
+**Universidad Nacional Agraria La Molina**  
+*Facultad de Economía y Planificación*  
+*Curso: Técnicas de Exploración de Datos*
+
+---
+
+**Grupo 6**
+
+**2025**
+
+<br>
+
+*Análisis reproducible con R y RStudio. El código fuente y los datos están disponibles para su revisión.*
+
+</div>
+
+---

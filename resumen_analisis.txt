@@ -1,0 +1,50 @@
+=============================================================================
+  ANÁLISIS DE TEXTO: PLAN DE GOBIERNO RENACER MOLINERO                     
+  UNALM - Elecciones Rectorales 2026-2031                                  
+=============================================================================
+
+RESUMEN ESTADÍSTICO:
+-------------------
+Total de palabras (tokens): 2349
+Palabras únicas: 782
+Palabras después de limpieza: 1269
+Stopwords eliminadas: 1080
+Bigramas únicos: 441
+Sentimientos detectados: 11
+Secciones temáticas analizadas: 11
+
+SECCIONES DEL PLAN DE GOBIERNO:
+-------------------------------
+1. Principios y Valores
+2. Gestión Institucional
+3. Personal Docente
+4. Estudiantes
+5. Personal No Docente
+6. Proceso Aprendizaje-Enseñanza
+7. Investigación
+8. Responsabilidad Social
+9. Innovación y Transferencia
+10. Recursos Financieros
+11. Seguridad
+
+
+TOP 5 PALABRAS MÁS FRECUENTES:
+------------------------------
+1. unalm (29 apariciones)
+2. docente (17 apariciones)
+3. estudiante (17 apariciones)
+4. fortaleceremos (17 apariciones)
+5. investigación (15 apariciones)
+
+TOP 3 SENTIMIENTOS:
+------------------
+1. positivo (316 palabras)
+2. confianza (152 palabras)
+3. premonición (50 palabras)
+
+TOP 3 BIGRAMAS:
+---------------
+1. unalm resolución (5 apariciones)
+2. actividades culturales (4 apariciones)
+3. responsabilidad social (4 apariciones)
+

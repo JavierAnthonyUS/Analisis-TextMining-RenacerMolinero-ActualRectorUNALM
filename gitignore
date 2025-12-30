@@ -1,0 +1,84 @@
+# =============================================================================
+# .gitignore para Proyecto R/RStudio - Text Mining UNALM
+# =============================================================================
+
+# ========================
+# Archivos de R/RStudio
+# ========================
+
+# Historial y datos de sesión
+.Rhistory
+.RData
+.Ruserdata
+.Rapp.history
+
+# Archivos de proyecto RStudio
+*.Rproj.user/
+.Rproj.user/
+
+# Archivos de caché de knitr
+*_cache/
+/cache/
+*_files/
+
+# Archivos intermedios de R Markdown
+*.utf8.md
+*.knit.md
+
+# ========================
+# Archivos temporales
+# ========================
+*~
+\#*\#
+.#*
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# ========================
+# Sistema operativo
+# ========================
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*.directory
+
+# ========================
+# Archivos grandes (opcional)
+# ========================
+# Descomenta si no quieres subir archivos muy grandes
+# *.pdf
+# *.rds
+
+# ========================
+# Archivos sensibles
+# ========================
+.Renviron
+.env
+*.secret
+credentials.*
+
+# ========================
+# Directorios de salida (opcional)
+# ========================
+# Descomenta si generas estos directorios
+# /output/
+# /figures/
+# /results/
+
+# ========================
+# Archivos de texto limpio generados
+# ========================
+texto_limpio.txt
