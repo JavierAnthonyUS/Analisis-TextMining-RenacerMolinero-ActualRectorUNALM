@@ -13,7 +13,7 @@ Proyecto de **Minería de Texto y Análisis de Sentimientos** aplicado a la prop
 
 Este análisis fue desarrollado como proyecto académico para el curso **Técnicas de Exploración de Datos**, impartido por el profesor **Jesús Salinas**.
 
-## 📂 Documentos Principales
+## 📂 Documentos Usados Para Exponer el Análisis de Minería de Texto
 
 | Archivo | Descripción |
 |---------|-------------|
